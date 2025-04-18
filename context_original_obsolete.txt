@@ -1,0 +1,179 @@
+# Cursor Context: Fully Automated Developer Agent (A2A-Powered)
+
+[General]
+project_name       = "cursor-auto-dev-agent"
+description        = "A CLI-driven, A2A-powered multi-agent developer pipeline that generates, tests, and iteratively refines code modules."
+version            = "0.1.0"
+repository_url     = "https://github.com/yourorg/cursor-auto-dev-agent"
+
+[Agents]
+# Agent Cards for discovery
+code_generator.agent_card_url = "https://agent-code-gen.example.com/.well-known/agent.json"
+test_runner.agent_card_url    = "https://agent-test.example.com/.well-known/agent.json"
+linter.agent_card_url         = "https://agent-lint.example.com/.well-known/agent.json"
+prompt_enhancer.agent_card_url= "https://agent-prompt.example.com/.well-known/agent.json"
+
+[Authentication]
+# API tokens or OAuth credentials
+code_generator.auth_type      = "Bearer"
+code_generator.token          = "CODE_GEN_API_TOKEN"
+test_runner.auth_type         = "Bearer"
+test_runner.token             = "TEST_RUN_API_TOKEN"
+linter.auth_type              = "Bearer"
+linter.token                  = "LINT_API_TOKEN"
+prompt_enhancer.auth_type     = "Bearer"
+prompt_enhancer.token         = "PROMPT_ENHANCER_TOKEN"
+
+[Workflow]
+# Workflow definitions with task templates
+generate_module_task = {
+  "type": "generate-module",
+  "input": {
+    "module_name": "{module_name}",
+    "scope": "{module_scope}"
+  }
+}
+run_tests_task = {
+  "type": "run-tests",
+  "input": {
+    "module_name": "{module_name}"
+  }
+}
+linter_task = {
+  "type": "lint-code",
+  "input": {
+    "module_name": "{module_name}"
+  }
+}
+enhance_prompt_task = {
+  "type": "enhance-prompt",
+  "input": {
+    "original_prompt": "{prompt}"
+  }
+}
+
+[CLI_Commands]
+# CLI command templates for Cursor
+init_project      = "cursor init --name {project_name} --repo {repository_url}"
+discover_agents   = "cursor agent discover"
+run_generate      = "cursor agent run-tasks --task-file generate_module_task.json"
+run_tests         = "cursor agent run-tasks --task-file run_tests_task.json"
+run_lint          = "cursor agent run-tasks --task-file linter_task.json"
+enhance_prompt    = "cursor agent run-tasks --task-file enhance_prompt_task.json"
+check_status      = "cursor agent status --task-id {task_id}"
+retrieve_artifact = "cursor agent get-artifact --task-id {task_id} --output {output_path}"
+
+[RetryPolicy]
+max_retries        = 5
+retry_backoff_sec  = 2
+
+[ContextManagement]
+# RAG strategy: snapshot and summarize every N interactions
+snapshot_interval  = 5
+snapshot_command   = "cursor context snapshot"
+update_card_command= "cursor agent update-card --agent {agent_name} --context context_summary.json"
+max_snapshot_size  = 1MB
+
+[ErrorHandling]
+# On test or lint failure, gather error artifact, generate fix task
+on_failure = {
+  "conditions": ["FAILED"],
+  "actions": [
+    {
+      "run": "cursor agent get-artifact --task-id {task_id} --part error_log --output error.log"
+    },
+    {
+      "run": "cursor agent run-tasks --task-file fix_errors_task.json --input error_log=error.log"
+    }
+  ]
+}
+
+[ExamplePrompts]
+# Initial user-level prompts guiding the multi-agent orchestration
+consultant_prompt = """
+As the Consultant Bot, analyze the user’s high-level request for a CLI‑integrated automated developer agent.
+Break down the scope into distinct functional areas (code generation, testing, linting, prompt enhancement, context management).
+Output a JSON scope definition for the PM Bot.
+"""
+pm_prompt = """
+As the PM Bot, take the scope JSON and decompose it into prioritized tasks with dependencies.
+Generate task definitions conforming to A2A Task schema.
+Return an ordered task list for the CLI Bot to execute.
+"""
+cli_prompt = """
+As the CLI Bot, consume the PM Bot’s ordered task list.
+Execute each task via A2A `tasks/send` API calls, monitor statuses, retrieve artifacts, and log progress.
+On failures, trigger the defined ErrorHandling workflow.
+"""
+
+[EnhancedRequirements]
+# Clarified and enhanced product requirements
+- Accept that initial user requirements may be vague; refine into clear MVP features.
+- **MVP Feature Set:**
+  1. Single initiation prompt that triggers full cycle:
+     - Consultant Bot: scope analysis
+     - PM Bot: task decomposition
+     - CLI Bot: code generation, testing, linting, iterative fixes
+  2. Automated test execution with error capture and self‑healing code refinement.
+  3. Prompt enhancement loop: agents optimize their own prompts based on outcomes.
+  4. Fallback strategies when an agent fails or times out.
+  5. Token‑efficient context management via RAG snapshots and summaries.
+- **Technical Constraints:**
+  - Simple setup for non‑expert developers: containerized local agents or mock stubs.
+  - Clear, human‑readable CLI commands.
+  - Minimal initial dependencies; extendable via plugin architecture.
+- **User Experience Goals:**
+  - Rapid feedback loop (< 5 min per generate/test/fix cycle for simple modules).
+  - Transparent status updates and artifact retrieval.
+
+{
+  "assistant": {
+    "name": "cursor-orchestrator",
+    "description": "CLI developer agent orchestrator using A2A protocol",
+    "agent_card_url": "https://your-domain.com/.well-known/agent.json",
+    "authentication": {
+      "type": "apiKey",
+      "in": "header",
+      "name": "Authorization",
+      "scheme": "Bearer"
+    }
+  },
+  "protocol": {
+    "transport": "http",
+    "use_sse": true,
+    "json_rpc_version": "2.0"
+  },
+  "agents": [
+    {
+      "id": "code-generator",
+      "agent_card_url": "https://your-domain.com/code-gen/.well-known/agent.json",
+      "description": "Generates feature modules from user prompt"
+    },
+    {
+      "id": "test-runner",
+      "agent_card_url": "https://your-domain.com/test-runner/.well-known/agent.json",
+      "description": "Executes tests and returns reports"
+    },
+    {
+      "id": "error-analyzer",
+      "agent_card_url": "https://your-domain.com/error-analyzer/.well-known/agent.json",
+      "description": "Parses test failures and suggests code fixes"
+    }
+  ],
+  "tasks": [
+    {
+      "name": "build_and_test",
+      "workflow": [
+        { "agent": "code-generator", "action": "generate_feature", "params": { "prompt": "{{initial_prompt}}" } },
+        { "agent": "test-runner", "action": "run_tests", "await": true },
+        { "agent": "error-analyzer", "action": "analyze_errors", "await": true },
+        { "agent": "code-generator", "action": "refine_code", "params": { "feedback": "{{error_report}}" } }
+      ],
+      "parallel": false
+    }
+  ],
+  "environment": {
+    "API_BASE_URL": "https://your-domain.com",
+    "A2A_TIMEOUT_MS": 300000
+  }
+}

@@ -1,0 +1,218 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Happiness Agent Card Schema",
+  "description": "Schema for Happiness Agent A2A protocol agent cards",
+  "type": "object",
+  "required": [
+    "name",
+    "description",
+    "version",
+    "api_version",
+    "authentication",
+    "endpoints",
+    "capabilities"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "The name of the agent"
+    },
+    "description": {
+      "type": "string",
+      "description": "A description of what the agent does"
+    },
+    "version": {
+      "type": "string",
+      "description": "The version of the agent implementation",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "api_version": {
+      "type": "string",
+      "description": "The version of the A2A API this agent implements",
+      "pattern": "^\\d+\\.\\d+$"
+    },
+    "authentication": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["Bearer", "OAuth2", "ApiKey", "Basic", "None"],
+          "description": "The type of authentication required"
+        },
+        "scheme": {
+          "type": "string",
+          "description": "The authentication scheme if applicable"
+        },
+        "in": {
+          "type": "string",
+          "enum": ["header", "query", "cookie"],
+          "description": "Where the authentication credentials should be provided"
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the authentication parameter"
+        },
+        "authorization_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "The URL for OAuth authorization if applicable"
+        },
+        "token_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "The URL for OAuth token retrieval if applicable"
+        }
+      }
+    },
+    "base_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "The base URL for API endpoints"
+    },
+    "endpoints": {
+      "type": "object",
+      "required": ["tasks"],
+      "properties": {
+        "tasks": {
+          "type": "object",
+          "required": ["send", "status", "artifacts"],
+          "properties": {
+            "send": {
+              "type": "string",
+              "description": "Path for sending tasks to the agent",
+              "default": "/api/tasks/send"
+            },
+            "status": {
+              "type": "string",
+              "description": "Path for checking task status",
+              "default": "/api/tasks/{task_id}/status"
+            },
+            "artifacts": {
+              "type": "string",
+              "description": "Path for retrieving task artifacts",
+              "default": "/api/tasks/{task_id}/artifacts"
+            },
+            "cancel": {
+              "type": "string",
+              "description": "Path for cancelling tasks",
+              "default": "/api/tasks/{task_id}/cancel"
+            }
+          }
+        },
+        "agent": {
+          "type": "object",
+          "properties": {
+            "health": {
+              "type": "string",
+              "description": "Path for health check endpoint",
+              "default": "/api/health"
+            },
+            "capabilities": {
+              "type": "string",
+              "description": "Path for querying agent capabilities",
+              "default": "/api/capabilities"
+            }
+          }
+        }
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "description": "A list of capabilities this agent provides",
+      "items": {
+        "type": "object",
+        "required": ["name", "description", "parameters", "returns"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The name of the capability"
+          },
+          "description": {
+            "type": "string",
+            "description": "A description of what the capability does"
+          },
+          "parameters": {
+            "type": "object",
+            "description": "The expected input parameters for this capability"
+          },
+          "returns": {
+            "type": "object",
+            "description": "The expected output of this capability"
+          },
+          "examples": {
+            "type": "array",
+            "description": "Examples of using this capability",
+            "items": {
+              "type": "object",
+              "required": ["input", "output"],
+              "properties": {
+                "input": {
+                  "type": "object",
+                  "description": "Example input"
+                },
+                "output": {
+                  "type": "object",
+                  "description": "Example output"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "contact": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the agent provider or contact person"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL for more information about the agent"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Email address for agent support"
+        }
+      }
+    },
+    "license": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the license"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "The URL for the license text"
+        }
+      }
+    },
+    "documentation": {
+      "type": "string",
+      "format": "uri",
+      "description": "URL to the agent's documentation"
+    },
+    "rate_limits": {
+      "type": "object",
+      "properties": {
+        "requests_per_minute": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum number of requests allowed per minute"
+        },
+        "burst": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum number of requests allowed in a burst"
+        }
+      }
+    }
+  }
+} 

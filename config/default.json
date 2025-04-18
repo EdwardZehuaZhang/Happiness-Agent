@@ -1,0 +1,167 @@
+{
+  "project": {
+    "name": "happiness-agent",
+    "version": "0.1.0",
+    "description": "A CLI-driven, A2A-powered multi-agent developer pipeline that generates, tests, and iteratively refines code modules.",
+    "repository": "https://github.com/happiness-ai/happiness-agent"
+  },
+  "agents": {
+    "consultant": {
+      "agent_card_url": "https://agent-consultant.happiness-ai.com/.well-known/agent.json",
+      "auth_type": "Bearer",
+      "token_env": "CONSULTANT_API_TOKEN",
+      "timeout_ms": 30000
+    },
+    "pm": {
+      "agent_card_url": "https://agent-pm.happiness-ai.com/.well-known/agent.json",
+      "auth_type": "Bearer",
+      "token_env": "PM_API_TOKEN",
+      "timeout_ms": 30000
+    },
+    "code_generator": {
+      "agent_card_url": "https://agent-code-gen.happiness-ai.com/.well-known/agent.json",
+      "auth_type": "Bearer",
+      "token_env": "CODE_GEN_API_TOKEN",
+      "timeout_ms": 60000
+    },
+    "test_runner": {
+      "agent_card_url": "https://agent-test.happiness-ai.com/.well-known/agent.json",
+      "auth_type": "Bearer",
+      "token_env": "TEST_RUN_API_TOKEN",
+      "timeout_ms": 60000
+    },
+    "linter": {
+      "agent_card_url": "https://agent-lint.happiness-ai.com/.well-known/agent.json",
+      "auth_type": "Bearer",
+      "token_env": "LINT_API_TOKEN",
+      "timeout_ms": 30000
+    },
+    "error_analyzer": {
+      "agent_card_url": "https://agent-error.happiness-ai.com/.well-known/agent.json",
+      "auth_type": "Bearer",
+      "token_env": "ERROR_ANALYZER_API_TOKEN",
+      "timeout_ms": 30000
+    },
+    "prompt_enhancer": {
+      "agent_card_url": "https://agent-prompt.happiness-ai.com/.well-known/agent.json",
+      "auth_type": "Bearer",
+      "token_env": "PROMPT_ENHANCER_TOKEN",
+      "timeout_ms": 30000
+    }
+  },
+  "workflows": {
+    "full_cycle": {
+      "tasks": [
+        {
+          "name": "analyze_requirements",
+          "agent": "consultant",
+          "action": "analyze_prompt",
+          "inputs": {
+            "user_prompt": "{{user_prompt}}"
+          },
+          "outputs": {
+            "scope_definition": "scope.json"
+          }
+        },
+        {
+          "name": "decompose_tasks",
+          "agent": "pm",
+          "action": "create_task_plan",
+          "inputs": {
+            "scope_definition": "{{scope_definition}}"
+          },
+          "outputs": {
+            "task_plan": "task_plan.json"
+          },
+          "depends_on": ["analyze_requirements"]
+        },
+        {
+          "name": "generate_code",
+          "agent": "code_generator",
+          "action": "generate_module",
+          "inputs": {
+            "task_plan": "{{task_plan}}"
+          },
+          "outputs": {
+            "generated_code": "generated/"
+          },
+          "depends_on": ["decompose_tasks"]
+        },
+        {
+          "name": "run_tests",
+          "agent": "test_runner",
+          "action": "test_module",
+          "inputs": {
+            "code_path": "{{generated_code}}"
+          },
+          "outputs": {
+            "test_results": "test_results.json"
+          },
+          "depends_on": ["generate_code"]
+        },
+        {
+          "name": "lint_code",
+          "agent": "linter",
+          "action": "lint_code",
+          "inputs": {
+            "code_path": "{{generated_code}}"
+          },
+          "outputs": {
+            "lint_results": "lint_results.json"
+          },
+          "depends_on": ["generate_code"]
+        },
+        {
+          "name": "analyze_errors",
+          "agent": "error_analyzer",
+          "action": "analyze_issues",
+          "inputs": {
+            "test_results": "{{test_results}}",
+            "lint_results": "{{lint_results}}"
+          },
+          "outputs": {
+            "error_analysis": "error_analysis.json"
+          },
+          "depends_on": ["run_tests", "lint_code"]
+        },
+        {
+          "name": "refine_code",
+          "agent": "code_generator",
+          "action": "refine_code",
+          "inputs": {
+            "code_path": "{{generated_code}}",
+            "error_analysis": "{{error_analysis}}"
+          },
+          "outputs": {
+            "refined_code": "refined/"
+          },
+          "depends_on": ["analyze_errors"]
+        }
+      ]
+    }
+  },
+  "cli": {
+    "commands": {
+      "init": "happiness init --name {{project_name}}",
+      "generate": "happiness generate --prompt \"{{user_prompt}}\"",
+      "status": "happiness status --task-id {{task_id}}",
+      "artifacts": "happiness artifacts --task-id {{task_id}} --output {{output_path}}"
+    }
+  },
+  "context_management": {
+    "snapshot_interval": 5,
+    "max_snapshot_size_kb": 1024,
+    "storage_path": "./context_snapshots/"
+  },
+  "retry_policy": {
+    "max_retries": 3,
+    "initial_backoff_ms": 1000,
+    "max_backoff_ms": 30000,
+    "backoff_multiplier": 2.0
+  },
+  "logging": {
+    "level": "info",
+    "format": "json",
+    "output_path": "./logs/"
+  }
+} 

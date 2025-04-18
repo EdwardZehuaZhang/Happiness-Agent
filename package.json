@@ -1,0 +1,21 @@
+{
+  "name": "happiness-agent",
+  "version": "0.1.0",
+  "description": "A CLI-driven code generator agent",
+  "main": "src/cli/index.js",
+  "bin": {
+    "happiness-mvp": "src/cli/mvp-cli.js"
+  },
+  "scripts": {
+    "start": "node src/cli/index.js",
+    "start:mvp": "node src/cli/mvp-cli.js",
+    "dev": "nodemon src/cli/index.js",
+    "test": "jest"
+  },
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "commander": "^11.0.0",
+    "inquirer": "^8.2.5",
+    "uuid": "^9.0.0"
+  }
+}
