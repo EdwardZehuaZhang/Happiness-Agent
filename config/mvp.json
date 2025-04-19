@@ -1,0 +1,42 @@
+{
+  "project": {
+    "name": "happiness-agent-mvp",
+    "version": "0.1.0",
+    "description": "Minimally Viable Product (MVP) version of Happiness Agent"
+  },
+  "code_generator": {
+    "api_url": "http://localhost:3000/api",
+    "api_key_env": "CODE_GEN_API_KEY",
+    "timeout_ms": 60000,
+    "supported_languages": ["javascript", "python"],
+    "templates_path": "./templates"
+  },
+  "storage": {
+    "base_path": ".happiness",
+    "generations_path": ".happiness/generated",
+    "config_file": ".happiness/project.json"
+  },
+  "validation": {
+    "enable_basic_testing": true,
+    "enable_linting": true
+  },
+  "cli": {
+    "commands": {
+      "init": "happiness-mvp init --name [project_name]",
+      "generate": "happiness-mvp generate [prompt] --language [language]",
+      "list": "happiness-mvp list",
+      "status": "happiness-mvp status [task-id]"
+    },
+    "colors": {
+      "success": "green",
+      "error": "red",
+      "info": "blue",
+      "warning": "yellow"
+    }
+  },
+  "logging": {
+    "level": "info",
+    "format": "simple",
+    "output_path": "./logs/"
+  }
+}

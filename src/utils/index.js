@@ -21,14 +21,14 @@ const logger = winston.createLogger({
     // Write logs to file
     new winston.transports.File({ 
       filename: path.join(
-        process.env.LOG_PATH || (fs.existsSync('.happiness') ? '.happiness/logs' : '.'),
+        process.env.LOG_PATH || (fs.existsSync('.happiness') ? '.happiness/logs' : '.'), 
         'error.log'
       ), 
       level: 'error' 
     }),
     new winston.transports.File({ 
       filename: path.join(
-        process.env.LOG_PATH || (fs.existsSync('.happiness') ? '.happiness/logs' : '.'),
+        process.env.LOG_PATH || (fs.existsSync('.happiness') ? '.happiness/logs' : '.'), 
         'combined.log'
       )
     })
@@ -193,11 +193,87 @@ const validationUtils = {
   }
 };
 
+/**
+ * Configuration utilities
+ */
+const configUtils = {
+  /**
+   * Load configuration from a file
+   * @param {string} configName - Name of the configuration (default, mvp)
+   * @returns {Object} Configuration object
+   */
+  loadConfig: (configName = 'mvp') => {
+    try {
+      // First try to load from NODE_ENV-specific config
+      const envConfig = process.env.NODE_ENV || 'development';
+      const configPath = path.resolve(__dirname, `../../config/${configName}.${envConfig}.json`);
+      
+      if (fs.existsSync(configPath)) {
+        return require(configPath);
+      }
+      
+      // Fall back to standard config
+      return require(`../../config/${configName}.json`);
+    } catch (error) {
+      logger.error(`Failed to load config "${configName}"`, error);
+      
+      // Return default minimal configuration
+      return {
+        project: {
+          name: "happiness-agent-mvp",
+          version: "0.1.0"
+        },
+        code_generator: {
+          api_url: "http://localhost:3000/api",
+          timeout_ms: 60000
+        },
+        storage: {
+          base_path: ".happiness",
+          generations_path: ".happiness/generated"
+        }
+      };
+    }
+  },
+  
+  /**
+   * Get project configuration from .happiness/project.json
+   * @returns {Object|null} Project configuration or null if not found
+   */
+  getProjectConfig: () => {
+    const projectConfigPath = '.happiness/project.json';
+    
+    if (!fs.existsSync(projectConfigPath)) {
+      return null;
+    }
+    
+    try {
+      return fileUtils.readJSON(projectConfigPath);
+    } catch (error) {
+      logger.error('Failed to read project configuration', error);
+      return null;
+    }
+  },
+  
+  /**
+   * Save project configuration to .happiness/project.json
+   * @param {Object} config - Project configuration
+   */
+  saveProjectConfig: (config) => {
+    try {
+      fileUtils.writeJSON('.happiness/project.json', config);
+    } catch (error) {
+      logger.error('Failed to save project configuration', error);
+      throw error;
+    }
+  }
+};
+
 module.exports = {
   logger,
   spinner,
   fileUtils,
   timeUtils,
   formatUtils,
-  validationUtils
-}; 
+  validationUtils,
+  configUtils
+};

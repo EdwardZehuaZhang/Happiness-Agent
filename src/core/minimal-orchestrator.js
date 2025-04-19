@@ -6,18 +6,72 @@
 
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
-const { logger } = require('../utils');
+const { logger, configUtils, fileUtils } = require('../utils');
+const { Orchestrator, Task } = require('../interfaces/core');
+const path = require('path');
+const fs = require('fs');
 
-class MinimalOrchestratorClient {
+class MinimalOrchestratorClient extends Orchestrator {
   /**
    * Initialize the minimal orchestrator client
-   * @param {Object} config - Configuration for the orchestrator
+   * @param {Object} customConfig - Optional custom configuration
    */
-  constructor(config) {
-    this.config = config;
+  constructor(customConfig = null) {
+    super();
+    // Load the MVP configuration
+    this.config = customConfig || configUtils.loadConfig('mvp');
     this.tasks = new Map();
-    this.codeGeneratorUrl = config.code_generator?.api_url || 'http://localhost:3000/api';
-    this.apiKey = process.env.CODE_GEN_API_KEY || 'demo-key';
+    this.codeGeneratorUrl = this.config.code_generator?.api_url || 'http://localhost:3000/api';
+    this.apiKey = process.env[this.config.code_generator?.api_key_env] || 'demo-key';
+    this.supportedLanguages = this.config.code_generator?.supported_languages || ['javascript', 'python'];
+    
+    // Load tasks from disk if available
+    this.loadTasksFromDisk();
+  }
+
+  /**
+   * Load tasks from disk
+   */
+  loadTasksFromDisk() {
+    try {
+      const basePath = this.config.storage?.base_path || '.happiness';
+      const tasksPath = path.join(basePath, 'tasks.json');
+      
+      if (fs.existsSync(tasksPath)) {
+        const tasksData = JSON.parse(fs.readFileSync(tasksPath, 'utf-8'));
+        
+        // Convert array back to Map
+        if (Array.isArray(tasksData)) {
+          tasksData.forEach(task => {
+            this.tasks.set(task.id, task);
+          });
+        }
+        
+        logger.info(`Loaded ${this.tasks.size} tasks from disk.`);
+      }
+    } catch (error) {
+      logger.error('Failed to load tasks from disk', error);
+    }
+  }
+
+  /**
+   * Save tasks to disk
+   */
+  saveTasksToDisk() {
+    try {
+      const basePath = this.config.storage?.base_path || '.happiness';
+      const tasksPath = path.join(basePath, 'tasks.json');
+      
+      fileUtils.ensureDir(basePath);
+      
+      // Convert Map to array for serialization
+      const tasksArray = Array.from(this.tasks.values());
+      
+      fs.writeFileSync(tasksPath, JSON.stringify(tasksArray, null, 2));
+      logger.info(`Saved ${tasksArray.length} tasks to disk.`);
+    } catch (error) {
+      logger.error('Failed to save tasks to disk', error);
+    }
   }
 
   /**
@@ -29,14 +83,12 @@ class MinimalOrchestratorClient {
   async generateCode(prompt, options = {}) {
     const taskId = uuidv4();
     
-    // Initialize the task state
-    this.tasks.set(taskId, {
-      id: taskId,
-      prompt,
-      options,
-      status: 'PENDING',
-      started_at: new Date().toISOString()
-    });
+    // Initialize the task using our Task interface
+    const task = new Task(taskId, prompt, options);
+    this.tasks.set(taskId, task);
+    
+    // Save tasks to disk immediately after creating a new one
+    this.saveTasksToDisk();
 
     // Start the code generation asynchronously
     this.executeCodeGeneration(taskId, prompt, options).catch(error => {
@@ -46,7 +98,11 @@ class MinimalOrchestratorClient {
       if (task) {
         task.status = 'FAILED';
         task.error = error.message;
+        task.completed_at = new Date().toISOString();
         this.tasks.set(taskId, task);
+        
+        // Save tasks to disk after update
+        this.saveTasksToDisk();
       }
     });
 
@@ -68,6 +124,7 @@ class MinimalOrchestratorClient {
     // Update task status
     task.status = 'RUNNING';
     this.tasks.set(taskId, task);
+    this.saveTasksToDisk();
 
     try {
       // In a real implementation, this would call the code generator API
@@ -76,31 +133,65 @@ class MinimalOrchestratorClient {
       // Step 1: Generate code
       task.status = 'GENERATING_CODE';
       this.tasks.set(taskId, task);
+      this.saveTasksToDisk();
       
       const generatedCode = await this.callCodeGenerator(prompt, options);
       
-      // Step 2: Simple validation/testing
-      task.status = 'VALIDATING';
-      this.tasks.set(taskId, task);
+      // Step 2: Simple validation/testing if enabled in config
+      if (this.config.validation?.enable_basic_testing) {
+        task.status = 'VALIDATING';
+        this.tasks.set(taskId, task);
+        this.saveTasksToDisk();
+        
+        const validationResult = this.validateCode(generatedCode);
+        task.results = {
+          code: generatedCode,
+          validation: validationResult
+        };
+      } else {
+        task.results = {
+          code: generatedCode,
+          validation: { passed: true, issues: [] }
+        };
+      }
       
-      const validationResult = this.validateCode(generatedCode);
-      
-      // Step 3: Store results
-      task.results = {
-        code: generatedCode,
-        validation: validationResult
-      };
+      // Step 3: Save artifacts if specified in config
+      if (this.config.storage?.generations_path) {
+        task.status = 'SAVING_ARTIFACTS';
+        this.tasks.set(taskId, task);
+        this.saveTasksToDisk();
+        
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const outputDir = path.join(
+          options.output || this.config.storage.generations_path,
+          `gen-${timestamp}`
+        );
+        
+        fileUtils.ensureDir(outputDir);
+        
+        // Save code files
+        for (const [filename, content] of Object.entries(generatedCode)) {
+          const filePath = path.join(outputDir, filename);
+          fileUtils.ensureDir(path.dirname(filePath));
+          fs.writeFileSync(filePath, content);
+        }
+        
+        task.outputPath = outputDir;
+      }
       
       task.status = 'COMPLETED';
       task.completed_at = new Date().toISOString();
       this.tasks.set(taskId, task);
+      this.saveTasksToDisk();
       
     } catch (error) {
       logger.error(`Task execution error for task ${taskId}`, error);
       
       task.status = 'FAILED';
       task.error = error.message;
+      task.completed_at = new Date().toISOString();
       this.tasks.set(taskId, task);
+      this.saveTasksToDisk();
       throw error;
     }
   }
@@ -128,6 +219,10 @@ class MinimalOrchestratorClient {
       case 'python':
         return this.generatePythonCode(prompt);
       default:
+        // Check if specified language is supported
+        if (options.language && !this.supportedLanguages.includes(options.language)) {
+          throw new Error(`Unsupported language: ${options.language}. Supported languages are: ${this.supportedLanguages.join(', ')}`);
+        }
         return this.generateJavaScriptCode(prompt); // Default to JavaScript
     }
   }
@@ -535,13 +630,13 @@ def load_data(file_path):
 # Perform basic data analysis
 def analyze_data(df):
     print("Performing data analysis")
-    print("\nData Sample:")
+    print("\\nData Sample:")
     print(df.head())
     
-    print("\nBasic Statistics:")
+    print("\\nBasic Statistics:")
     print(df.describe())
     
-    print("\nChecking for missing values:")
+    print("\\nChecking for missing values:")
     print(df.isnull().sum())
     
     # Basic visualization
@@ -723,7 +818,8 @@ ${Object.keys(files).map(file => `- ${file}`).join('\n')}
       prompt: task.prompt,
       error: task.error,
       started_at: task.started_at,
-      completed_at: task.completed_at
+      completed_at: task.completed_at,
+      outputPath: task.outputPath
     };
   }
 
@@ -755,9 +851,10 @@ ${Object.keys(files).map(file => `- ${file}`).join('\n')}
       status: task.status,
       prompt: task.prompt.substring(0, 50) + (task.prompt.length > 50 ? '...' : ''),
       started_at: task.started_at,
-      completed_at: task.completed_at
+      completed_at: task.completed_at,
+      outputPath: task.outputPath
     }));
   }
 }
 
-module.exports = { MinimalOrchestratorClient }; 
+module.exports = { MinimalOrchestratorClient };
